@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Daniel Gallegos</title>
+		<style>
+			body{
+				/* overscroll-behavior: none; */
+				font-family: "Garamond";
+			}
+			*{
+				margin: 0;
+				padding: 0;
+			}
+			#container{
+				width: 100vw;
+				height: 100vh;
+				border: 0px solid #f00;	
+				overflow: hidden;
+			}
+			canvas{
+				display: block;
+			}
+			.curtain{
+				width: 100%;
+				position: fixed;
+				height: 50%;
+				background: white;
+				z-index: 100;
+				mix-blend-mode: difference;
+				overflow: hidden;	
+				transition: height .01s ease; /* Smooth transition */			
+			}
+			h1 {
+				font-family: 'Garamond', sans-serif;
+				padding: 50px;
+			}
+			.right-aligned {
+				text-align: right;
+				font-family: 'Garamond', sans-serif;
+				padding-right:50px;
+			}
+			a {
+            color: black; /* Default color */
+            text-decoration: none; /* Underline by default */
+			}
+
+			/* Style for the link when hovered */
+			a:hover {
+				color: blue; /* Change color on hover */
+				text-decoration: none; /* Remove underline on hover */
+			}
+
+			/* Style for the link when visited */
+			a:visited {
+				color: none; /* Change color after clicking */
+			}
+
+			/* Optional: Remove underline on hover */
+			a:focus {
+				outline: none; /* Optional: Remove outline on focus */
+			}
+			
+		</style>
+		<script type="text/javascript" src="https://github.com/dataarts/dat.gui/blob/master/build/dat.gui.js"></script>
+	</head>
+	<body>
+		<div class="curtain">
+			<h1><a href="index.html">Daniel Gallegos</h1>
+			<!--<h2 class="right-aligned"><a href="projects.html">Projects</a></h2>-->
+			<h2 class="right-aligned"><a href="about.html">About Me</a></h2>
+			<!--<h2 class="right-aligned"><a href="education.html">Education</a></h2>-->
+
+		</div>
+		<div id="container"></div>
+		
+		<!-- Include scripts for shaders -->
+		<script id="fragmentShader" type="x-shader/x-fragment">
+			// original: 
+			// void main() {gl_FragColor = vec4(1.,0.5,0.,1.); }
+
+			// new:
+			uniform float time;
+			uniform float progress;
+			uniform sampler2D texture1;
+			uniform vec4 resolution;
+			varying vec2 vUv;
+			varying vec3 vPosition;
+			float PI = 3.141592653589793238;
+			void main() {
+				// vec2 newUV = (vUv - vec2(0.5)) * resolution.zw + vec(0.5);
+				gl_FragColor = vec4(0.,0.0,0.,1.);
+			}
+		</script>
+
+		<script id="vertexShader" type="x-shader/x-vertex">
+			uniform float time;
+			varying vec2 vUv;
+			varying vec3 vPosition;
+			uniform sampler2D positionTexture;
+			attribute vec2 reference;
+			float PI = 3.141592653589793238;
+
+
+			//
+			// Description : Array and textureless GLSL 2D simplex noise function.
+			//      Author : Ian McEwan, Ashima Arts.
+			//  Maintainer : ijm
+			//     Lastmod : 20110822 (ijm)
+			//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
+			//               Distributed under the MIT License. See LICENSE file.
+			//               https://github.com/ashima/webgl-noise
+			//
+
+			vec3 mod289(vec3 x) {
+				return x - floor(x * (1.0 / 289.0)) * 289.0;
+			}
+
+			vec2 mod289(vec2 x) {
+				return x - floor(x * (1.0 / 289.0)) * 289.0;
+			}
+
+			vec3 permute(vec3 x) {
+				return mod289(((x*34.0)+1.0)*x);
+			}
+
+			float noise(vec2 v)
+			{
+				const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+								0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+								-0.577350269189626,  // -1.0 + 2.0 * C.x
+								0.024390243902439); // 1.0 / 41.0
+				// First corner
+				vec2 i  = floor(v + dot(v, C.yy) );
+				vec2 x0 = v -   i + dot(i, C.xx);
+
+				// Other corners
+				vec2 i1;
+				//i1.x = step( x0.y, x0.x ); // x0.x > x0.y ? 1.0 : 0.0
+				//i1.y = 1.0 - i1.x;
+				i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+				// x0 = x0 - 0.0 + 0.0 * C.xx ;
+				// x1 = x0 - i1 + 1.0 * C.xx ;
+				// x2 = x0 - 1.0 + 2.0 * C.xx ;
+				vec4 x12 = x0.xyxy + C.xxzz;
+				x12.xy -= i1;
+
+				// Permutations
+				i = mod289(i); // Avoid truncation effects in permutation
+				vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+					+ i.x + vec3(0.0, i1.x, 1.0 ));
+
+				vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+				m = m*m ;
+				m = m*m ;
+
+				// Gradients: 41 points uniformly over a line, mapped onto a diamond.
+				// The ring size 17*17 = 289 is close to a multiple of 41 (41*7 = 287)
+
+				vec3 x = 2.0 * fract(p * C.www) - 1.0;
+				vec3 h = abs(x) - 0.5;
+				vec3 ox = floor(x + 0.5);
+				vec3 a0 = x - ox;
+
+				// Normalise gradients implicitly by scaling m
+				// Approximation of: m *= inversesqrt( a0*a0 + h*h );
+				m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+
+				// Compute final noise value at P
+				vec3 g;
+				g.x  = a0.x  * x0.x  + h.x  * x0.y;
+				g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+				return 130.0 * dot(m, g);
+			}
+
+			vec3 curl(float	x,	float	y,	float	z)
+			{
+
+				float	eps	= 1., eps2 = 2. * eps;
+				float	n1,	n2,	a,	b;
+
+				x += time * .05;
+				y += time * .05;
+				z += time * .05;
+
+				vec3	curl = vec3(0.);
+
+				n1	=	noise(vec2( x,	y	+	eps ));
+				n2	=	noise(vec2( x,	y	-	eps ));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2( x,	z	+	eps));
+				n2	=	noise(vec2( x,	z	-	eps));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.x	=	a	-	b;
+
+				n1	=	noise(vec2( y,	z	+	eps));
+				n2	=	noise(vec2( y,	z	-	eps));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2( x	+	eps,	z));
+				n2	=	noise(vec2( x	+	eps,	z));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.y	=	a	-	b;
+
+				n1	=	noise(vec2( x	+	eps,	y));
+				n2	=	noise(vec2( x	-	eps,	y));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2(  y	+	eps,	z));
+				n2	=	noise(vec2(  y	-	eps,	z));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.z	=	a	-	b;
+
+				return	curl;
+			}
+
+			void main() {
+				vUv = reference;
+				//vec3 pos = texture(positionTexture, reference).xyz;
+
+				vec3 newpos = position;
+				float f = 6.;
+				float amplitude = 1.;
+				float maxDistance = 2.;
+				vec3 target = position+curl( newpos.x * f, newpos.y * f, newpos.z * f ) * amplitude;
+				float d = length( newpos-target ) / maxDistance;
+				newpos = mix( position, target, pow( d, 5. ) );
+
+				vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.);
+
+				gl_PointSize = 2. * (1./ -mvPosition.z);
+				gl_Position = projectionMatrix * mvPosition;
+			}
+		</script>
+
+		<script id="fragmentSimulation" type="x-shader/x-fragment">
+			uniform float time;
+			uniform float delta;
+			uniform sampler2D texturePosition;
+
+			//
+			// Description : Array and textureless GLSL 2D simplex noise function.
+			//      Author : Ian McEwan, Ashima Arts.
+			//  Maintainer : ijm
+			//     Lastmod : 20110822 (ijm)
+			//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
+			//               Distributed under the MIT License. See LICENSE file.
+			//               https://github.com/ashima/webgl-noise
+			//
+
+			vec3 mod289(vec3 x) {
+				return x - floor(x * (1.0 / 289.0)) * 289.0;
+			}
+
+			vec2 mod289(vec2 x) {
+				return x - floor(x * (1.0 / 289.0)) * 289.0;
+			}
+
+			vec3 permute(vec3 x) {
+				return mod289(((x*34.0)+1.0)*x);
+			}
+
+			float noise(vec2 v)
+			{
+				const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+								0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+								-0.577350269189626,  // -1.0 + 2.0 * C.x
+								0.024390243902439); // 1.0 / 41.0
+				// First corner
+				vec2 i  = floor(v + dot(v, C.yy) );
+				vec2 x0 = v -   i + dot(i, C.xx);
+
+				// Other corners
+				vec2 i1;
+				//i1.x = step( x0.y, x0.x ); // x0.x > x0.y ? 1.0 : 0.0
+				//i1.y = 1.0 - i1.x;
+				i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+				// x0 = x0 - 0.0 + 0.0 * C.xx ;
+				// x1 = x0 - i1 + 1.0 * C.xx ;
+				// x2 = x0 - 1.0 + 2.0 * C.xx ;
+				vec4 x12 = x0.xyxy + C.xxzz;
+				x12.xy -= i1;
+
+				// Permutations
+				i = mod289(i); // Avoid truncation effects in permutation
+				vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+					+ i.x + vec3(0.0, i1.x, 1.0 ));
+
+				vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+				m = m*m ;
+				m = m*m ;
+
+				// Gradients: 41 points uniformly over a line, mapped onto a diamond.
+				// The ring size 17*17 = 289 is close to a multiple of 41 (41*7 = 287)
+
+				vec3 x = 2.0 * fract(p * C.www) - 1.0;
+				vec3 h = abs(x) - 0.5;
+				vec3 ox = floor(x + 0.5);
+				vec3 a0 = x - ox;
+
+				// Normalise gradients implicitly by scaling m
+				// Approximation of: m *= inversesqrt( a0*a0 + h*h );
+				m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+
+				// Compute final noise value at P
+				vec3 g;
+				g.x  = a0.x  * x0.x  + h.x  * x0.y;
+				g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+				return 130.0 * dot(m, g);
+			}
+
+			vec3 curl(float	x,	float	y,	float	z)
+			{
+
+				float	eps	= 1., eps2 = 2. * eps;
+				float	n1,	n2,	a,	b;
+
+				x += time * .05;
+				y += time * .05;
+				z += time * .05;
+
+				vec3	curl = vec3(0.);
+
+				n1	=	noise(vec2( x,	y	+	eps ));
+				n2	=	noise(vec2( x,	y	-	eps ));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2( x,	z	+	eps));
+				n2	=	noise(vec2( x,	z	-	eps));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.x	=	a	-	b;
+
+				n1	=	noise(vec2( y,	z	+	eps));
+				n2	=	noise(vec2( y,	z	-	eps));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2( x	+	eps,	z));
+				n2	=	noise(vec2( x	+	eps,	z));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.y	=	a	-	b;
+
+				n1	=	noise(vec2( x	+	eps,	y));
+				n2	=	noise(vec2( x	-	eps,	y));
+				a	=	(n1	-	n2)/eps2;
+
+				n1	=	noise(vec2(  y	+	eps,	z));
+				n2	=	noise(vec2(  y	-	eps,	z));
+				b	=	(n1	-	n2)/eps2;
+
+				curl.z	=	a	-	b;
+
+				return	curl;
+			}
+
+			void main() {
+				vec2 uv = gl_FragCoord.xy / resolution.xy;
+				vec4 tmpPos = texture2D( texturePosition, uv );
+				vec3 pos = tmpPos.xyz;
+				float f = 1.;
+				float frequency = 1.;
+				float amplitude = 0.002;
+
+				vec3 target = pos + amplitude*curl(f*pos.x,f*pos.y,f*pos.z);
+
+
+				gl_FragColor = vec4(target, 1.);
+
+			}
+
+		</script>
+
+		<script type="module">
+			import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.125.2/build/three.module.js';
+
+			import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.125.2/examples/jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.125.2/examples/jsm/loaders/GLTFLoader.js';
+			
+			//////////////////////////////////////////////////////////
+			
+			// Import GPUComputationRenderer
+
+			import {
+				ClampToEdgeWrapping,
+				DataTexture,
+				FloatType,
+				NearestFilter,
+				RGBAFormat,
+				ShaderMaterial,
+				WebGLRenderTarget,
+				BufferGeometry,
+				Float32BufferAttribute,
+				OrthographicCamera,
+				Mesh
+			} from 'https://cdn.jsdelivr.net/npm/three@0.125.2/build/three.module.js';
+
+			const _camera = new OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
+
+
+			class FullscreenTriangleGeometry extends BufferGeometry {
+
+			constructor() {
+
+				super();
+
+				this.setAttribute( 'position', new Float32BufferAttribute( [ - 1, 3, 0, - 1, - 1, 0, 3, - 1, 0 ], 3 ) );
+				this.setAttribute( 'uv', new Float32BufferAttribute( [ 0, 2, 0, 0, 2, 0 ], 2 ) );
+
+			}
+
+			}
+
+			const _geometry = new FullscreenTriangleGeometry();
+
+			class FullScreenQuad {
+
+				constructor( material ) {
+
+					this._mesh = new Mesh( _geometry, material );
+
+				}
+
+				dispose() {
+
+					this._mesh.geometry.dispose();
+
+				}
+
+				render( renderer ) {
+
+					renderer.render( this._mesh, _camera );
+
+				}
+
+				get material() {
+
+					return this._mesh.material;
+
+				}
+
+				set material( value ) {
+
+					this._mesh.material = value;
+
+				}
+
+				}
+
+			/**
+			 * GPUComputationRenderer, based on SimulationRenderer by zz85
+			 *
+			 * The GPUComputationRenderer uses the concept of variables. These variables are RGBA float textures that hold 4 floats
+			 * for each compute element (texel)
+			 *
+			 * Each variable has a fragment shader that defines the computation made to obtain the variable in question.
+			 * You can use as many variables you need, and make dependencies so you can use textures of other variables in the shader
+			 * (the sampler uniforms are added automatically) Most of the variables will need themselves as dependency.
+			 *
+			 * The renderer has actually two render targets per variable, to make ping-pong. Textures from the current frame are used
+			 * as inputs to render the textures of the next frame.
+			 *
+			 * The render targets of the variables can be used as input textures for your visualization shaders.
+			 *
+			 * Variable names should be valid identifiers and should not collide with THREE GLSL used identifiers.
+			 * a common approach could be to use 'texture' prefixing the variable name; i.e texturePosition, textureVelocity...
+			 *
+			 * The size of the computation (sizeX * sizeY) is defined as 'resolution' automatically in the shader. For example:
+			 * #DEFINE resolution vec2( 1024.0, 1024.0 )
+			 *
+			 * -------------
+			 *
+			 * Basic use:
+			 *
+			 * // Initialization...
+			 *
+			 * // Create computation renderer
+			 * const gpuCompute = new GPUComputationRenderer( 1024, 1024, renderer );
+			 *
+			 * // Create initial state float textures
+			 * const pos0 = gpuCompute.createTexture();
+			 * const vel0 = gpuCompute.createTexture();
+			 * // and fill in here the texture data...
+			 *
+			 * // Add texture variables
+			 * const velVar = gpuCompute.addVariable( "textureVelocity", fragmentShaderVel, vel0 );
+			 * const posVar = gpuCompute.addVariable( "texturePosition", fragmentShaderPos, pos0 );
+			 *
+			 * // Add variable dependencies
+			 * gpuCompute.setVariableDependencies( velVar, [ velVar, posVar ] );
+			 * gpuCompute.setVariableDependencies( posVar, [ velVar, posVar ] );
+			 *
+			 * // Add custom uniforms
+			 * velVar.material.uniforms.time = { value: 0.0 };
+			 *
+			 * // Check for completeness
+			 * const error = gpuCompute.init();
+			 * if ( error !== null ) {
+			 *		console.error( error );
+			* }
+			*
+			*
+			* // In each frame...
+			*
+			* // Compute!
+			* gpuCompute.compute();
+			*
+			* // Update texture uniforms in your visualization materials with the gpu renderer output
+			* myMaterial.uniforms.myTexture.value = gpuCompute.getCurrentRenderTarget( posVar ).texture;
+			*
+			* // Do your rendering
+			* renderer.render( myScene, myCamera );
+			*
+			* -------------
+			*
+			* Also, you can use utility functions to create ShaderMaterial and perform computations (rendering between textures)
+			* Note that the shaders can have multiple input textures.
+			*
+			* const myFilter1 = gpuCompute.createShaderMaterial( myFilterFragmentShader1, { theTexture: { value: null } } );
+			* const myFilter2 = gpuCompute.createShaderMaterial( myFilterFragmentShader2, { theTexture: { value: null } } );
+			*
+			* const inputTexture = gpuCompute.createTexture();
+			*
+			* // Fill in here inputTexture...
+			*
+			* myFilter1.uniforms.theTexture.value = inputTexture;
+			*
+			* const myRenderTarget = gpuCompute.createRenderTarget();
+			* myFilter2.uniforms.theTexture.value = myRenderTarget.texture;
+			*
+			* const outputRenderTarget = gpuCompute.createRenderTarget();
+			*
+			* // Now use the output texture where you want:
+			* myMaterial.uniforms.map.value = outputRenderTarget.texture;
+			*
+			* // And compute each frame, before rendering to screen:
+			* gpuCompute.doRenderTarget( myFilter1, myRenderTarget );
+			* gpuCompute.doRenderTarget( myFilter2, outputRenderTarget );
+			*
+			*
+			*
+			* @param {int} sizeX Computation problem size is always 2d: sizeX * sizeY elements.
+			* @param {int} sizeY Computation problem size is always 2d: sizeX * sizeY elements.
+			* @param {WebGLRenderer} renderer The renderer
+			*/
+
+			class GPUComputationRenderer {
+
+				constructor( sizeX, sizeY, renderer ) {
+
+					this.variables = [];
+
+					this.currentTextureIndex = 0;
+
+					let dataType = FloatType;
+
+					const passThruUniforms = {
+						passThruTexture: { value: null }
+					};
+
+					const passThruShader = createShaderMaterial( getPassThroughFragmentShader(), passThruUniforms );
+
+					const quad = new FullScreenQuad( passThruShader );
+
+					this.setDataType = function ( type ) {
+
+						dataType = type;
+						return this;
+
+					};
+
+					this.addVariable = function ( variableName, computeFragmentShader, initialValueTexture ) {
+
+						const material = this.createShaderMaterial( computeFragmentShader );
+
+						const variable = {
+							name: variableName,
+							initialValueTexture: initialValueTexture,
+							material: material,
+							dependencies: null,
+							renderTargets: [],
+							wrapS: null,
+							wrapT: null,
+							minFilter: NearestFilter,
+							magFilter: NearestFilter
+						};
+
+						this.variables.push( variable );
+
+						return variable;
+
+					};
+
+					this.setVariableDependencies = function ( variable, dependencies ) {
+
+						variable.dependencies = dependencies;
+
+					};
+
+					this.init = function () {
+
+						if ( renderer.capabilities.maxVertexTextures === 0 ) {
+
+							return 'No support for vertex shader textures.';
+
+						}
+
+						for ( let i = 0; i < this.variables.length; i ++ ) {
+
+							const variable = this.variables[ i ];
+
+							// Creates rendertargets and initialize them with input texture
+							variable.renderTargets[ 0 ] = this.createRenderTarget( sizeX, sizeY, variable.wrapS, variable.wrapT, variable.minFilter, variable.magFilter );
+							variable.renderTargets[ 1 ] = this.createRenderTarget( sizeX, sizeY, variable.wrapS, variable.wrapT, variable.minFilter, variable.magFilter );
+							this.renderTexture( variable.initialValueTexture, variable.renderTargets[ 0 ] );
+							this.renderTexture( variable.initialValueTexture, variable.renderTargets[ 1 ] );
+
+							// Adds dependencies uniforms to the ShaderMaterial
+							const material = variable.material;
+							const uniforms = material.uniforms;
+
+							if ( variable.dependencies !== null ) {
+
+								for ( let d = 0; d < variable.dependencies.length; d ++ ) {
+
+									const depVar = variable.dependencies[ d ];
+
+									if ( depVar.name !== variable.name ) {
+
+										// Checks if variable exists
+										let found = false;
+
+										for ( let j = 0; j < this.variables.length; j ++ ) {
+
+											if ( depVar.name === this.variables[ j ].name ) {
+
+												found = true;
+												break;
+
+											}
+
+										}
+
+										if ( ! found ) {
+
+											return 'Variable dependency not found. Variable=' + variable.name + ', dependency=' + depVar.name;
+
+										}
+
+									}
+
+									uniforms[ depVar.name ] = { value: null };
+
+									material.fragmentShader = '\nuniform sampler2D ' + depVar.name + ';\n' + material.fragmentShader;
+
+								}
+
+							}
+
+						}
+
+						this.currentTextureIndex = 0;
+
+						return null;
+
+					};
+
+					this.compute = function () {
+
+						const currentTextureIndex = this.currentTextureIndex;
+						const nextTextureIndex = this.currentTextureIndex === 0 ? 1 : 0;
+
+						for ( let i = 0, il = this.variables.length; i < il; i ++ ) {
+
+							const variable = this.variables[ i ];
+
+							// Sets texture dependencies uniforms
+							if ( variable.dependencies !== null ) {
+
+								const uniforms = variable.material.uniforms;
+
+								for ( let d = 0, dl = variable.dependencies.length; d < dl; d ++ ) {
+
+									const depVar = variable.dependencies[ d ];
+
+									uniforms[ depVar.name ].value = depVar.renderTargets[ currentTextureIndex ].texture;
+
+								}
+
+							}
+
+							// Performs the computation for this variable
+							this.doRenderTarget( variable.material, variable.renderTargets[ nextTextureIndex ] );
+
+						}
+
+						this.currentTextureIndex = nextTextureIndex;
+
+					};
+
+					this.getCurrentRenderTarget = function ( variable ) {
+
+						return variable.renderTargets[ this.currentTextureIndex ];
+
+					};
+
+					this.getAlternateRenderTarget = function ( variable ) {
+
+						return variable.renderTargets[ this.currentTextureIndex === 0 ? 1 : 0 ];
+
+					};
+
+					this.dispose = function () {
+
+						quad.dispose();
+
+						const variables = this.variables;
+
+						for ( let i = 0; i < variables.length; i ++ ) {
+
+							const variable = variables[ i ];
+
+							if ( variable.initialValueTexture ) variable.initialValueTexture.dispose();
+
+							const renderTargets = variable.renderTargets;
+
+							for ( let j = 0; j < renderTargets.length; j ++ ) {
+
+								const renderTarget = renderTargets[ j ];
+								renderTarget.dispose();
+
+							}
+
+						}
+
+					};
+
+					function addResolutionDefine( materialShader ) {
+
+						materialShader.defines.resolution = 'vec2( ' + sizeX.toFixed( 1 ) + ', ' + sizeY.toFixed( 1 ) + ' )';
+
+					}
+
+					this.addResolutionDefine = addResolutionDefine;
+
+
+					// The following functions can be used to compute things manually
+
+					function createShaderMaterial( computeFragmentShader, uniforms ) {
+
+						uniforms = uniforms || {};
+
+						const material = new ShaderMaterial( {
+							name: 'GPUComputationShader',
+							uniforms: uniforms,
+							vertexShader: getPassThroughVertexShader(),
+							fragmentShader: computeFragmentShader
+						} );
+
+						addResolutionDefine( material );
+
+						return material;
+
+					}
+
+					this.createShaderMaterial = createShaderMaterial;
+
+					this.createRenderTarget = function ( sizeXTexture, sizeYTexture, wrapS, wrapT, minFilter, magFilter ) {
+
+						sizeXTexture = sizeXTexture || sizeX;
+						sizeYTexture = sizeYTexture || sizeY;
+
+						wrapS = wrapS || ClampToEdgeWrapping;
+						wrapT = wrapT || ClampToEdgeWrapping;
+
+						minFilter = minFilter || NearestFilter;
+						magFilter = magFilter || NearestFilter;
+
+						const renderTarget = new WebGLRenderTarget( sizeXTexture, sizeYTexture, {
+							wrapS: wrapS,
+							wrapT: wrapT,
+							minFilter: minFilter,
+							magFilter: magFilter,
+							format: RGBAFormat,
+							type: dataType,
+							depthBuffer: false
+						} );
+
+						return renderTarget;
+
+					};
+
+					this.createTexture = function () {
+
+						const data = new Float32Array( sizeX * sizeY * 4 );
+						const texture = new DataTexture( data, sizeX, sizeY, RGBAFormat, FloatType );
+						texture.needsUpdate = true;
+						return texture;
+
+					};
+
+					this.renderTexture = function ( input, output ) {
+
+						// Takes a texture, and render out in rendertarget
+						// input = Texture
+						// output = RenderTarget
+
+						passThruUniforms.passThruTexture.value = input;
+
+						this.doRenderTarget( passThruShader, output );
+
+						passThruUniforms.passThruTexture.value = null;
+
+					};
+
+					this.doRenderTarget = function ( material, output ) {
+
+						const currentRenderTarget = renderer.getRenderTarget();
+
+						const currentXrEnabled = renderer.xr.enabled;
+						const currentShadowAutoUpdate = renderer.shadowMap.autoUpdate;
+
+						renderer.xr.enabled = false; // Avoid camera modification
+						renderer.shadowMap.autoUpdate = false; // Avoid re-computing shadows
+						quad.material = material;
+						renderer.setRenderTarget( output );
+						quad.render( renderer );
+						quad.material = passThruShader;
+
+						renderer.xr.enabled = currentXrEnabled;
+						renderer.shadowMap.autoUpdate = currentShadowAutoUpdate;
+
+						renderer.setRenderTarget( currentRenderTarget );
+
+					};
+
+					// Shaders
+
+					function getPassThroughVertexShader() {
+
+						return	'void main()	{\n' +
+								'\n' +
+								'	gl_Position = vec4( position, 1.0 );\n' +
+								'\n' +
+								'}\n';
+
+					}
+
+					function getPassThroughFragmentShader() {
+
+						return	'uniform sampler2D passThruTexture;\n' +
+								'\n' +
+								'void main() {\n' +
+								'\n' +
+								'	vec2 uv = gl_FragCoord.xy / resolution.xy;\n' +
+								'\n' +
+								'	gl_FragColor = texture2D( passThruTexture, uv );\n' +
+								'\n' +
+								'}\n';
+
+					}
+
+				}
+
+			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			// import fragment from "./shader/fragment.glsl"
+			// import fragmentSimulation from "./shader/fragmentSimulation.glsl"
+			// import vertex from "./shader/vertexParticles.glsl"
+
+			// import * as dat from "./nodemodules/dat.gui";
+
+			// import gsap from "./nodemodules/gsap";
+			
+			// import face from './brain4.glb';
+
+			// Texture width determines particles
+			const WIDTH = 128;
+
+
+
+			export default class Sketch{
+				constructor(options){      
+					this.scene = new THREE.Scene();
+
+					this.container = options.dom;
+					this.width = this.container.offsetWidth;
+					this.height = this.container.offsetHeight;
+					this.renderer = new THREE.WebGLRenderer();
+					this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+					this.renderer.setSize( this.width, this.height );
+					this.renderer.setClearColor(0xeeeeee,1);
+					this.renderer.outputEncoding = THREE.sRGBEncoding;
+
+					this.container.appendChild(this.renderer.domElement);
+					this.loader = new GLTFLoader();
+
+					this.camera = new THREE.PerspectiveCamera(
+						70,
+						window.innerWidth / window.innerHeight,
+						0.001,
+						1000
+					)
+
+					
+					this.camera.position.set(0,0,2);
+					this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+					this.time = 0;
+
+					this.loader.load("https://raw.githubusercontent.com/danielegos/dgSite2/main/brain4.glb",(gltf)=>{
+						console.log(gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0]);
+						
+						this.model = gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0];
+						this.model.geometry.scale(.02,.02,.02);
+						this.model.geometry.translate(0,-.5,0);
+						this.model.geometry.rotateY(-Math.PI/2);
+						
+
+						this.facePos = this.model.geometry.attributes.position.array;
+						this.faceNumber = this.facePos.length/3;
+						console.log(this.facePos);
+
+						this.isPlaying = true;    
+						this.initGPGPU();    
+						this.addObjects();
+						this.resize();
+						this.render();
+						this.setupResize();
+
+
+					})
+
+
+
+				}
+
+				initGPGPU() {
+					this.gpuCompute = new GPUComputationRenderer(WIDTH,WIDTH,this.renderer);
+					this.dtPosition = this.gpuCompute.createTexture();
+					//console.log(this.dtPosition);
+					this.fillPositions(this.dtPosition);
+
+					this.positionVariable = this.gpuCompute.addVariable('texturePosition', 
+					document.getElementById( 'fragmentSimulation' ).textContent, this.dtPosition);
+
+					//console.log(this.gpuCompute)
+
+					this.positionVariable.material.uniforms['time'] = {value: 0};
+
+					this.positionVariable.wrapS = THREE.RepeatWrapping;
+					this.positionVariable.wrapT = THREE.RepeatWrapping;
+					this.gpuCompute.init();
+
+				}
+
+				fillPositions(texture) {
+					let arr = texture.image.data;
+					for (let i = 0; i < arr.length; i=i+4) {
+
+						let rand = Math.floor(Math.random()*this.faceNumber)
+						// let x = Math.random();
+						// let y = Math.random();
+						// let z = Math.random();
+
+						let x = this.facePos[3*rand];
+						let y = this.facePos[3*rand+1];
+						let z = this.facePos[3*rand+2];
+
+						arr[i] = x;
+						arr[i+1] = y;
+						arr[i+2] = z;
+						arr[i+3] = 1;
+
+					}
+				}
+
+				settings() {
+					let that = this;
+					this.settings = {
+						progress: 0,
+					};
+					this.gui = new dat.gui.GUI();
+					this.gui.add(this.settings, "progress", 0,1,0.01);
+				}
+
+				setupResize() {
+					window.addEventListener("resize", this.resize.bind(this));
+				}
+
+				resize() {
+					this.width = this.container.offsetWidth;
+					this.height = this.container.offsetHeight;
+					this.renderer.setSize(this.width, this.height);
+					this.camera.aspect = this.width / this.height;
+
+					
+
+					this.camera.updateProjectionMatrix();
+				}
+
+
+				addObjects() {
+					let that = this;
+					this.material = new THREE.ShaderMaterial({
+						extensions: {
+							derivatives: "#extension GL_OES_standard_derivatives : enable"
+						},
+						side: THREE.DoubleSide,
+						uniforms: {
+							time: {value: 0 },
+							positionTexture: { value: null },
+							resolution: {value: new THREE.Vector4()},
+						},
+						vertexShader: document.getElementById( 'vertexShader' ).textContent,
+						fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+					});
+
+					this.geometry = new THREE.BufferGeometry();
+					let positions = new Float32Array(WIDTH*WIDTH*3);
+					let reference = new Float32Array(WIDTH*WIDTH*2);
+					for (let i = 0; i < WIDTH*WIDTH; i++) {
+						let x = Math.random();
+						let y = Math.random();
+						let z = Math.random();
+						let xx = (i%WIDTH)/WIDTH;
+						let yy = ~~(i/WIDTH)/WIDTH;
+						positions.set([x,y,z],i*3)
+						reference.set([xx,yy],i*2)
+					}
+
+					this.geometry.setAttribute('position', 
+						new THREE.BufferAttribute(positions,3))
+					this.geometry.setAttribute('reference', 
+						new THREE.BufferAttribute(reference,2))
+					
+					// Use brain model:
+					this.geometry = this.model.geometry;
+
+					// Use sphere:
+					// this.geometry = new THREE.IcosahedronGeometry(1.,136);
+					this.plane = new THREE.Points(this.geometry, this.material);
+					this.scene.add(this.plane)
+				}
+
+				stop() {
+					this.isPlaying = false;
+
+				}
+
+				play() {
+					if(!this.isPlaying) {
+						this.render()
+						this.isPlaying = true;
+					}
+				}
+
+
+				render() {
+					if(!this.isPlaying) return;
+					this.time += 0.05;
+
+					this.positionVariable.material.uniforms['time'].value = this.time;
+
+					this.gpuCompute.compute();
+					this.material.uniforms.positionTexture.value = this.gpuCompute.getCurrentRenderTarget(
+						this.positionVariable).texture;
+
+					this.material.uniforms.time.value = this.time;
+
+					
+					requestAnimationFrame(this.render.bind(this));
+					this.renderer.render(this.scene, this.camera);
+				}    
+			}
+
+			new Sketch({
+				dom: document.getElementById("container")
+			});
+
+
+		</script>
+	</body>
+</html>>

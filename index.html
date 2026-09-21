@@ -894,7 +894,7 @@
 
 			// import gsap from "./nodemodules/gsap";
 
-			// import face from './dilophosaurus_skull_lowRes.glb';
+			// import face from './brain4.glb';
 
 			// Texture width determines particles
 			const WIDTH = 128;
@@ -937,7 +937,7 @@
 					this.mouseTarget = new THREE.Vector3();
 					window.addEventListener('mousemove', this.onMouseMove.bind(this));
 
-					this.loader.load("https://raw.githubusercontent.com/danielegos/dg/main/dilophosaurus_skull_lowRes.glb",(gltf)=>{
+					this.loader.load("https://raw.githubusercontent.com/danielegos/dg/main/brain4.glb",(gltf)=>{
 						console.log(gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0]);
 
 						this.model = gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0];

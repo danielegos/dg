@@ -384,6 +384,7 @@
 
 			import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.125.2/examples/jsm/controls/OrbitControls.js';
 			import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.125.2/examples/jsm/loaders/GLTFLoader.js';
+			// import { mergeGeometries } from 'https://cdn.jsdelivr.net/npm/three@0.125.2/examples/jsm/utils/BufferGeometryUtils.js';
 
 			//////////////////////////////////////////////////////////
 
@@ -897,7 +898,7 @@
 			// import face from './brain4.glb';
 
 			// Texture width determines particles
-			const WIDTH = 128;
+			const WIDTH = 128; // originally 128
 
 
 
@@ -937,17 +938,101 @@
 					this.mouseTarget = new THREE.Vector3();
 					window.addEventListener('mousemove', this.onMouseMove.bind(this));
 
-					this.loader.load("https://raw.githubusercontent.com/danielegos/dg/main/brain4.glb",(gltf)=>{
-						console.log(gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0]);
+					// Brain file
+					this.brain_file = "https://raw.githubusercontent.com/danielegos/dg/main/brain4.glb";
 
-						this.model = gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0];
-						this.model.geometry.scale(.02,.02,.02);
-						this.model.geometry.translate(0,-.5,0);
-						this.model.geometry.rotateY(-Math.PI/2);
+					// Dilophosaurus file
+					this.dilophosaurus_file = "https://raw.githubusercontent.com/danielegos/dg/main/dilophosaurus_skull_lowRes.glb";
+
+					this.dino_skull_hi_res = "https://raw.githubusercontent.com/danielegos/dg/main/RaptorSkull.glb";
+
+					// Set glb file
+					this.glb_file = this.brain_file;
+
+					// Original gltf loader
+
+					// this.loader.load(this.glb_file,(gltf)=>{
+
+					// 	if (this.glb_file === this.brain_file) {
+					// 		// Use brain_file
+					// 		console.log(gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0]);
+					// 		this.model = gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0];
+					// 		this.model.geometry.scale(.02,.02,.02);
+					// 		this.model.geometry.translate(0,-.5,0);
+					// 		this.model.geometry.rotateY(-Math.PI/2);
+					// 	} else if (this.glb_file === this.dilophosaurus_file) {
+					// 		// Use dilophosaurus_file
+					// 		console.log(gltf.scene.children[0].children[0].children[0]);
+					// 		this.model = gltf.scene.children[0].children[0].children[0];
+					// 		this.model.geometry.scale(.02,.02,.02);
+					// 		this.model.geometry.translate(0,-.5,0);
+					// 		this.model.geometry.rotateY(-Math.PI/2);
+					// 	}
+
+					// 	this.facePos = this.model.geometry.attributes.position.array;
+					// 	this.faceNumber = this.facePos.length/3;
+					// 	console.log(this.facePos);
+
+					// 	this.isPlaying = true;
+					// 	this.initGPGPU();
+					// 	this.addObjects();
+					// 	this.resize();
+					// 	this.render();
+					// 	this.setupResize();
+					// })
 
 
-						this.facePos = this.model.geometry.attributes.position.array;
-						this.faceNumber = this.facePos.length/3;
+
+					// Claude version
+					this.loader.load(this.glb_file, (gltf) => {
+						// 1. Find every mesh instead of hard-coding the child path
+						const meshes = [];
+						gltf.scene.updateWorldMatrix(true, true);
+						gltf.scene.traverse((child) => {
+							if (child.isMesh) meshes.push(child);
+						});
+						console.log(meshes.map(m => m.name), meshes.length);
+
+						// 2. Bake each node's transform into its geometry, then merge
+						const geoms = meshes.map((m) => {
+							const g = m.geometry.clone();
+							g.applyMatrix4(m.matrixWorld);   // GLB nodes often carry scale/rotation
+							// keep only position so attributes match for merging
+							for (const name of Object.keys(g.attributes)) {
+							if (name !== 'position') g.deleteAttribute(name);
+							}
+							return g.index ? g.toNonIndexed() : g;
+						});
+
+						// import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+						const geometry = geoms.length > 1 ? mergeGeometries(geoms) : geoms[0];
+
+						// 3. Normalize size and center, so it works for any model
+						geometry.computeBoundingBox();
+						const size = new THREE.Vector3();
+						const center = new THREE.Vector3();
+						geometry.boundingBox.getSize(size);
+						geometry.boundingBox.getCenter(center);
+						geometry.translate(-center.x, -center.y, -center.z);
+						const s = 2 / Math.max(size.x, size.y, size.z); // fit in ~2 units
+						geometry.scale(s, s, s);
+						this.model = { geometry };          // or a Mesh, if you use .material later
+						this.facePos = geometry.attributes.position.array;
+
+						// Model-specific tweaks
+						if (this.glb_file === this.brain_file) {
+							geometry.rotateY(-Math.PI / 2);
+							this.faceNumber = this.facePos.length / 3;
+						}
+						// dilophosaurus: adjust rotation here if it faces the wrong way
+						if (this.glb_file === this.dilophosaurus_file) {
+							geometry.rotateY(-Math.PI / 1);
+							geometry.scale(1,1,1);
+							this.faceNumber = this.facePos.length / 1000;
+						}
+
+						
+						
 						console.log(this.facePos);
 
 						this.isPlaying = true;
@@ -958,8 +1043,8 @@
 						this.setupResize();
 
 
-					})
-
+						
+						});
 
 
 				}

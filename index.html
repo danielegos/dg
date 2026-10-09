@@ -926,17 +926,31 @@
 					)
 
 
-					this.camera.position.set(0,0,2);
+					this.camera.position.set(0,0,1.2);
 					this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 					this.time = 0;
 
-					// Mouse-follow setup: track normalized cursor position and
-					// project it onto a plane in front of the camera each frame.
+					// // Mouse-follow setup: track normalized cursor position and
+					// // project it onto a plane in front of the camera each frame.
+					// this.mouse = new THREE.Vector2(0, 0);
+					// this.raycaster = new THREE.Raycaster();
+					// this.mouseTargetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+					// this.mouseTarget = new THREE.Vector3();
+					// window.addEventListener('mousemove', this.onMouseMove.bind(this));
+
+					// Mouse-look setup: keep the mesh centered and rotate it to face the cursor.
 					this.mouse = new THREE.Vector2(0, 0);
 					this.raycaster = new THREE.Raycaster();
-					this.mouseTargetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 					this.mouseTarget = new THREE.Vector3();
+					this.lookMatrix = new THREE.Matrix4();
+					this.targetQuat = new THREE.Quaternion();
+
+					// Corrects for whichever way the model's "front" (snout) points in its own space.
+					// Identity = snout points along +Z. See the note below if it points elsewhere.
+					this.facingOffset = new THREE.Quaternion();
+
 					window.addEventListener('mousemove', this.onMouseMove.bind(this));
+
 
 					// Brain file
 					this.brain_file = "https://raw.githubusercontent.com/danielegos/dg/main/brain4.glb";
@@ -947,42 +961,8 @@
 					this.dino_skull_hi_res = "https://raw.githubusercontent.com/danielegos/dg/main/RaptorSkull.glb";
 
 					// Set glb file
-					this.glb_file = this.brain_file;
-
-					// Original gltf loader
-
-					// this.loader.load(this.glb_file,(gltf)=>{
-
-					// 	if (this.glb_file === this.brain_file) {
-					// 		// Use brain_file
-					// 		console.log(gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0]);
-					// 		this.model = gltf.scene.children[0].children[0].children[0].children[0].children[0].children[0];
-					// 		this.model.geometry.scale(.02,.02,.02);
-					// 		this.model.geometry.translate(0,-.5,0);
-					// 		this.model.geometry.rotateY(-Math.PI/2);
-					// 	} else if (this.glb_file === this.dilophosaurus_file) {
-					// 		// Use dilophosaurus_file
-					// 		console.log(gltf.scene.children[0].children[0].children[0]);
-					// 		this.model = gltf.scene.children[0].children[0].children[0];
-					// 		this.model.geometry.scale(.02,.02,.02);
-					// 		this.model.geometry.translate(0,-.5,0);
-					// 		this.model.geometry.rotateY(-Math.PI/2);
-					// 	}
-
-					// 	this.facePos = this.model.geometry.attributes.position.array;
-					// 	this.faceNumber = this.facePos.length/3;
-					// 	console.log(this.facePos);
-
-					// 	this.isPlaying = true;
-					// 	this.initGPGPU();
-					// 	this.addObjects();
-					// 	this.resize();
-					// 	this.render();
-					// 	this.setupResize();
-					// })
-
-
-
+					this.glb_file = this.dino_skull_hi_res;
+					
 					// Claude version
 					this.loader.load(this.glb_file, (gltf) => {
 						// 1. Find every mesh instead of hard-coding the child path
@@ -1029,6 +1009,21 @@
 							geometry.rotateY(-Math.PI / 1);
 							geometry.scale(1,1,1);
 							this.faceNumber = this.facePos.length / 1000;
+						}
+
+						// Hi-res dino skull tweaks
+						if (this.glb_file === this.dino_skull_hi_res) {
+							// snout along +X:
+							// this.facingOffset.setFromEuler(new THREE.Euler(0, -Math.PI / 4, 0));
+							// // snout along -X:
+							// this.facingOffset.setFromEuler(new THREE.Euler(0,  Math.PI / 1, 0));
+							// // snout along -Z (faces away):
+							// this.facingOffset.setFromEuler(new THREE.Euler(0,  Math.PI, 0));
+
+							// geometry.rotateY(-Math.PI / 2);
+							// geometry.rotateX(-Math.PI / 2);
+							// geometry.rotateZ(-Math.PI / 2);
+
 						}
 
 						
@@ -1187,12 +1182,28 @@
 
 					this.material.uniforms.time.value = this.time;
 
-					// Smoothly move the object toward the cursor's projected position.
-					this.raycaster.setFromCamera(this.mouse, this.camera);
-					this.raycaster.ray.intersectPlane(this.mouseTargetPlane, this.mouseTarget);
-					if (this.plane && this.mouseTarget) {
-						this.plane.position.x += (this.mouseTarget.x - this.plane.position.x) * 0.1;
-						this.plane.position.y += (this.mouseTarget.y - this.plane.position.y) * 0.1;
+					// // Smoothly move the object toward the cursor's projected position.
+					// this.raycaster.setFromCamera(this.mouse, this.camera);
+					// this.raycaster.ray.intersectPlane(this.mouseTargetPlane, this.mouseTarget);
+					// if (this.plane && this.mouseTarget) {
+					// 	this.plane.position.x += (this.mouseTarget.x - this.plane.position.x) * 0.1;
+					// 	this.plane.position.y += (this.mouseTarget.y - this.plane.position.y) * 0.1;
+					// }
+
+					// Rotate (don't move) the object so it keeps pointing at the cursor.
+					if (this.plane) {
+						// A point along the cursor's ray, in front of the camera.
+						this.raycaster.setFromCamera(this.mouse, this.camera);
+						// this.raycaster.ray.at(3, this.mouseTarget);
+						this.raycaster.ray.at(1, this.mouseTarget);   // z ≈ +1, between the camera and the model
+
+						// Matrix4.lookAt(eye, target, up) points +Z from target toward eye,
+						// so using the cursor point as "eye" aims the object's +Z at the cursor.
+						this.lookMatrix.lookAt(this.mouseTarget, this.plane.position, this.plane.up);
+						this.targetQuat.setFromRotationMatrix(this.lookMatrix).multiply(this.facingOffset);
+
+						// Ease toward the target orientation (0.1 = same smoothing as before).
+						this.plane.quaternion.slerp(this.targetQuat, 0.1);
 					}
 
 
